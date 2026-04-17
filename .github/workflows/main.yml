@@ -18,29 +18,28 @@ jobs:
         run: |
           sudo rm -rf /usr/share/dotnet /etc/apt/sources.list.d/*
           sudo -E apt-get -qq update
-          # 修正了依赖安装脚本的地址，这是编译成功的关键
           sudo -E apt-get -qq install $(curl -fsSL https://githubusercontent.com)
           sudo -E apt-get -qq autoremove --purge
           sudo -E apt-get -qq clean
 
       - name: Prepare source code
         run: |
-          # 创建并进入 immortalwrt 目录
-          mkdir immortalwrt
-          # 将当前仓库代码拷贝进去
-          cp -r ./* ./immortalwrt/ 2>/dev/null || true 
+          git clone --depth 1 https://github.com immortalwrt
           cd immortalwrt
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
       - name: SSH connection to Actions
         uses: P3TERX/ssh2actions@main
-        if: (github.event.inputs.ssh == 'true') || contains(github.event.action, 'ssh')
+        if: github.event.inputs.ssh == 'true'
+        env:
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
 
       - name: Compile the firmware
         run: |
           cd immortalwrt
-          # 如果你在 SSH 里没保存 .config，这里会报错，所以请务必在 SSH 里完成配置并保存
+          # 这一步只有在你从 SSH 输入 exit 退出后才会执行
           make -j$(nproc) || make -j1 V=s
 
       - name: Upload artifact
@@ -48,4 +47,5 @@ jobs:
         with:
           name: ImmortalWrt_firmware
           path: immortalwrt/bin/targets/
+
 
