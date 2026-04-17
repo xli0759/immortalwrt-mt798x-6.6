@@ -18,34 +18,32 @@ jobs:
         run: |
           sudo rm -rf /usr/share/dotnet /etc/apt/sources.list.d/*
           sudo -E apt-get -qq update
+          # 安装必要的编译依赖
           sudo -E apt-get -qq install $(curl -fsSL https://githubusercontent.com)
           sudo -E apt-get -qq autoremove --purge
           sudo -E apt-get -qq clean
 
-      - name: Prepare source code
+      - name: Update & Install Feeds
         run: |
-          git clone --depth 1 https://github.com immortalwrt
-          cd immortalwrt
+          # 直接在当前根目录操作，不再创建子目录
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
       - name: SSH connection to Actions
         uses: P3TERX/ssh2actions@main
         if: github.event.inputs.ssh == 'true'
-        env:
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
 
       - name: Compile the firmware
+        id: compile
         run: |
-          cd immortalwrt
-          # 这一步只有在你从 SSH 输入 exit 退出后才会执行
+          # 只有在你 SSH 连进去配置好 .config 并 exit 后才会执行这里
           make -j$(nproc) || make -j1 V=s
+          echo "status=success" >> $GITHUB_OUTPUT
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
+        if: steps.compile.outputs.status == 'success'
         with:
-          name: ImmortalWrt_firmware
-          path: immortalwrt/bin/targets/
-
+          name: ImmortalWrt_EA0326GMP
+          path: bin/targets/
 
