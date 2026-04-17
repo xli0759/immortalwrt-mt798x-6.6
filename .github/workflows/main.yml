@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4  # 已更新
 
       - name: Initialization environment
         run: |
@@ -36,10 +36,12 @@ jobs:
       - name: Compile the firmware
         run: |
           cd openwrt
+          # 初始编译建议先选好机型和插件，然后保存退出
           make -j$(nproc) || make -j1 V=s
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4  # 已更新为 v4
         with:
           name: OpenWrt_firmware
           path: openwrt/bin/targets/
+
