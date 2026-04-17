@@ -12,20 +12,24 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4  # 已更新
+        uses: actions/checkout@v4
 
       - name: Initialization environment
         run: |
           sudo rm -rf /usr/share/dotnet /etc/apt/sources.list.d/*
           sudo -E apt-get -qq update
+          # 修正了依赖安装脚本的地址，这是编译成功的关键
           sudo -E apt-get -qq install $(curl -fsSL https://githubusercontent.com)
           sudo -E apt-get -qq autoremove --purge
           sudo -E apt-get -qq clean
 
-      - name: Clone source code
+      - name: Prepare source code
         run: |
-          git clone --depth 1 https://github.com openwrt
-          cd openwrt
+          # 创建并进入 immortalwrt 目录
+          mkdir immortalwrt
+          # 将当前仓库代码拷贝进去
+          cp -r ./* ./immortalwrt/ 2>/dev/null || true 
+          cd immortalwrt
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
@@ -35,13 +39,13 @@ jobs:
 
       - name: Compile the firmware
         run: |
-          cd openwrt
-          # 初始编译建议先选好机型和插件，然后保存退出
+          cd immortalwrt
+          # 如果你在 SSH 里没保存 .config，这里会报错，所以请务必在 SSH 里完成配置并保存
           make -j$(nproc) || make -j1 V=s
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4  # 已更新为 v4
+        uses: actions/upload-artifact@v4
         with:
-          name: OpenWrt_firmware
-          path: openwrt/bin/targets/
+          name: ImmortalWrt_firmware
+          path: immortalwrt/bin/targets/
 
