@@ -2,41 +2,56 @@ name: Manual Build
 on:
   workflow_dispatch:
     inputs:
-      ssh:
-        description: 'SSH connection to Actions'
-        required: false
-        default: 'true'
+      device:
+        description: 'Target device'
+        required: true
+        default: 'mt7981'
+        type: choice
+        options:
+          - mt7981
+          - mt7986
 
 jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
       - name: Initialization environment
         run: |
           sudo rm -rf /usr/share/dotnet /etc/apt/sources.list.d/*
           sudo -E apt-get -qq update
-          # 安装必要的编译依赖
-          sudo -E apt-get -qq install $(curl -fsSL https://githubusercontent.com)
+          sudo -E apt-get -qq install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
+            bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib \
+            git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libfuse-dev libglib2.0-dev libgmp3-dev \
+            libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libpython3-dev libreadline-dev \
+            libssl-dev libtool lrzsz mkisofs msmtp ninja-build p7zip p7zip-full patch pkgconf python3 \
+            python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion swig texinfo \
+            uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev
           sudo -E apt-get -qq autoremove --purge
           sudo -E apt-get -qq clean
 
-      - name: Update & Install Feeds
+      - name: Clone source
         run: |
-          # 直接在当前根目录操作，不再创建子目录
+          git clone -b openwrt-24.10-6.6 --single-branch --filter=blob:none \
+            https://github.com/padavanonly/immortalwrt-mt798x-24.10 immortalwrt-mt798x-24.10
+
+      - name: Update & Install Feeds
+        working-directory: immortalwrt-mt798x-24.10
+        run: |
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
+      - name: Copy defconfig
+        working-directory: immortalwrt-mt798x-24.10
+        run: |
+          cp -f defconfig/${{ github.event.inputs.device }}-ax3000.config .config
+
       - name: SSH connection to Actions
         uses: P3TERX/ssh2actions@main
-        if: github.event.inputs.ssh == 'true'
 
-      - name: Compile the firmware
+      - name: Compile
         id: compile
+        working-directory: immortalwrt-mt798x-24.10
         run: |
-          # 只有在你 SSH 连进去配置好 .config 并 exit 后才会执行这里
           make -j$(nproc) || make -j1 V=s
           echo "status=success" >> $GITHUB_OUTPUT
 
@@ -44,6 +59,5 @@ jobs:
         uses: actions/upload-artifact@v4
         if: steps.compile.outputs.status == 'success'
         with:
-          name: ImmortalWrt_EA0326GMP
-          path: bin/targets/
-
+          name: ImmortalWrt_${{ github.event.inputs.device }}
+          path: immortalwrt-mt798x-24.10/bin/targets/
